@@ -33,10 +33,10 @@
         <div class="bg-slate-900 text-white p-6 text-center">
             <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
                 <i data-lucide="map-pin" class="text-[#03C75A]"></i>
-                애드메이커스 AI 플레이스 상위노출 진단
+                AI 플레이스 상위노출 진단
             </h1>
             <p class="text-slate-300 mt-2 text-sm">2026년 최신 로직 반영 · 상위 5대 지표 정밀 분석</p>
-        </div> 
+        </div>
 
         <div class="p-8">
             
@@ -64,7 +64,7 @@
                 <div class="loader mx-auto mb-6"></div>
                 <h2 class="text-2xl font-bold mb-2 text-slate-800">AI가 데이터를 분석하고 있습니다</h2>
                 <p id="loadingText" class="text-slate-500 font-medium h-6">데이터 수집 및 마케팅 알고리즘 연산 중...</p>
-                <p class="text-xs text-slate-400 mt-4">(약 5~10초 정도 소요될 수 있습니다)</p>
+                <p class="text-xs text-slate-400 mt-4">Render 무료 서버 사용 중 (최대 30초 소요)</p>
             </div>
 
             <!-- STEP 3 & 4: 실제 서버 연동 결과 화면 -->
@@ -134,7 +134,6 @@
     <script>
         lucide.createIcons();
 
-        // 뱃지 색상을 상태에 따라 변경해주는 함수
         function getBadgeClass(status) {
             if(status === '위험') return 'px-2 py-1 bg-red-100 text-red-600 text-xs font-bold rounded';
             if(status === '보통') return 'px-2 py-1 bg-yellow-100 text-yellow-600 text-xs font-bold rounded';
@@ -142,7 +141,6 @@
             return 'px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded';
         }
 
-        // 실제 파이썬 백엔드 서버와 통신하는 함수
         async function startRealAnalysis() {
             const urlInput = document.getElementById('placeUrl').value;
             const errorMsg = document.getElementById('errorMsg');
@@ -153,13 +151,12 @@
             }
             errorMsg.classList.add('hidden');
 
-            // 로딩 화면 표시
             document.getElementById('step1-input').classList.add('hidden');
             document.getElementById('step2-loading').classList.remove('hidden');
 
             try {
-                // 1. 파이썬 서버로 데이터 전송 (주소가 127.0.0.1:8000 이어야 합니다)
-                const response = await fetch('https://n-place-analyzer.onrender.com/analyze', {
+                // 주의: 아래 주소를 대표님의 실제 Render API 주소로 변경했는지 꼭 확인해주세요!!
+                const response = await fetch('https://my-place-api.onrender.com/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: urlInput })
@@ -167,28 +164,28 @@
 
                 const result = await response.json();
 
-                // 서버에서 400 에러 등을 반환했을 때
                 if (!response.ok) {
-                    alert(result.detail || "URL 분석 중 오류가 발생했습니다.");
-                    location.reload();
+                    alert("서버 오류: " + (result.detail || "알 수 없는 오류"));
+                    // [핵심 수정] 에러가 나도 강제로 새로고침 하지 않고, 다시 입력할 수 있게 입력창으로 돌려보냅니다.
+                    document.getElementById('step2-loading').classList.add('hidden');
+                    document.getElementById('step1-input').classList.remove('hidden');
                     return;
                 }
 
-                // 크롤링 자체에서 에러가 났을 때
-                if (result.raw_data.status === 'error') {
-                    alert("데이터를 긁어오지 못했습니다. 링크를 다시 확인해주세요.");
-                    location.reload();
+                // [핵심 수정] 크롤링 에러가 났을 때 어떤 에러인지 팝업에 정확히 띄워줍니다.
+                if (result.raw_data && result.raw_data.status === 'error') {
+                    alert("데이터 수집 실패. (상세 원인: " + result.raw_data.message + ")");
+                    document.getElementById('step2-loading').classList.add('hidden');
+                    document.getElementById('step1-input').classList.remove('hidden');
                     return;
                 }
 
-                // 2. 서버에서 받은 데이터를 HTML 화면에 입히기
                 const data = result.analysis;
                 const shopName = result.raw_data.shop_name;
                 
                 document.getElementById('shopNameDisplay').innerText = `[${shopName}] 상위노출 경쟁력 요약`;
                 document.getElementById('totalScoreDisplay').innerText = data.total_score;
                 
-                // 점수에 따라 글자 색상 변경
                 const scoreWrap = document.getElementById('scoreColorWrap');
                 const scoreMsg = document.getElementById('scoreMessage');
                 if (data.total_score >= 80) {
@@ -205,7 +202,6 @@
                     scoreMsg.innerText = "🚨 1페이지 노출을 위해 시급한 개선이 필요합니다.";
                 }
 
-                // 5대 지표 업데이트
                 const metrics = data.metrics;
                 const mapping = {
                     'trafficStatus': metrics.traffic.status,
@@ -221,14 +217,14 @@
                     el.className = getBadgeClass(status);
                 }
 
-                // 3. 로딩 숨기고 결과 화면 띄우기
                 document.getElementById('step2-loading').classList.add('hidden');
                 document.getElementById('step3-results').classList.remove('hidden');
 
             } catch (error) {
                 console.error(error);
-                alert("서버와 연결할 수 없습니다. 터미널에서 FastAPI 서버가 켜져 있는지 확인해주세요!");
-                location.reload();
+                alert("서버 연결 시간 초과 또는 네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+                document.getElementById('step2-loading').classList.add('hidden');
+                document.getElementById('step1-input').classList.remove('hidden');
             }
         }
     </script>
