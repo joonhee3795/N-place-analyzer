@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버 플레이스 AI 진단 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .naver-green { color: #03C75A; }
+        .bg-naver-green { background-color: #03C75A; }
+        .hover-bg-naver-green:hover { background-color: #02b351; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #03C75A;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .blur-content { filter: blur(6px); user-select: none; pointer-events: none; }
+    </style>
+</head>
+<body class="text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <!-- 메인 컨테이너 -->
+    <div class="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden relative">
+        
+        <!-- 헤더 -->
+        <div class="bg-slate-900 text-white p-6 text-center">
+            <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+                <i data-lucide="map-pin" class="text-[#03C75A]"></i>
+                AI 플레이스 상위노출 진단
+            </h1>
+            <p class="text-slate-300 mt-2 text-sm">2026년 최신 로직 반영 · 상위 5대 지표 정밀 분석</p>
+        </div>
+
+        <div class="p-8">
+            
+            <!-- STEP 1: URL 입력창 -->
+            <div id="step1-input">
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold mb-3 text-slate-800">우리 매장, 왜 1페이지에 없을까?</h2>
+                    <p class="text-slate-500">네이버 플레이스 URL을 입력하시면,<br>현재 상위노출 지표 점수와 문제점을 무료로 분석해 드립니다.</p>
+                </div>
+                
+                <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-6">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">네이버 플레이스 URL</label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="placeUrl" placeholder="https://map.naver.com/v5/entry/place/..." class="flex-1 px-4 py-3 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#03C75A] focus:border-transparent w-full">
+                        <button onclick="startRealAnalysis()" class="bg-naver-green hover-bg-naver-green text-white px-6 py-3 rounded-lg font-bold transition-colors whitespace-nowrap shadow-md flex items-center justify-center gap-2">
+                            <i data-lucide="search" class="w-5 h-5"></i> 무료 진단하기
+                        </button>
+                    </div>
+                    <p id="errorMsg" class="text-red-500 text-sm mt-2 hidden">URL을 입력해주세요.</p>
+                </div>
+            </div>
+
+            <!-- STEP 2: 로딩 화면 -->
+            <div id="step2-loading" class="hidden text-center py-16">
+                <div class="loader mx-auto mb-6"></div>
+                <h2 class="text-2xl font-bold mb-2 text-slate-800">AI가 데이터를 분석하고 있습니다</h2>
+                <p id="loadingText" class="text-slate-500 font-medium h-6">데이터 수집 및 마케팅 알고리즘 연산 중...</p>
+                <p class="text-xs text-slate-400 mt-4">(약 5~10초 정도 소요될 수 있습니다)</p>
+            </div>
+
+            <!-- STEP 3 & 4: 실제 서버 연동 결과 화면 -->
+            <div id="step3-results" class="hidden">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">분석이 완료되었습니다.</h2>
+                    <p id="shopNameDisplay" class="text-blue-600 font-bold mt-1">[매장명] 상위노출 경쟁력 요약</p>
+                </div>
+
+                <!-- 종합 점수 (서버 데이터) -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center mb-6">
+                    <p class="text-slate-600 font-semibold mb-2">현재 종합 상위노출 예상 점수</p>
+                    <div class="text-5xl font-extrabold flex items-center justify-center gap-2" id="scoreColorWrap">
+                        <span id="totalScoreDisplay">0</span><span class="text-2xl text-slate-400">/ 100점</span>
+                    </div>
+                    <p id="scoreMessage" class="text-sm mt-3 font-medium">결과를 계산 중입니다...</p>
+                </div>
+
+                <!-- 5대 지표 요약 (서버 데이터) -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+                    <div class="bg-slate-50 border p-3 rounded-lg text-center flex flex-col items-center justify-center">
+                        <p class="text-xs text-slate-500 mb-1">트래픽</p>
+                        <span id="trafficStatus" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded">대기</span>
+                    </div>
+                    <div class="bg-slate-50 border p-3 rounded-lg text-center flex flex-col items-center justify-center">
+                        <p class="text-xs text-slate-500 mb-1">체류시간</p>
+                        <span id="dwellStatus" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded">대기</span>
+                    </div>
+                    <div class="bg-slate-50 border p-3 rounded-lg text-center flex flex-col items-center justify-center">
+                        <p class="text-xs text-slate-500 mb-1">검색적합도</p>
+                        <span id="seoStatus" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded">대기</span>
+                    </div>
+                    <div class="bg-slate-50 border p-3 rounded-lg text-center flex flex-col items-center justify-center">
+                        <p class="text-xs text-slate-500 mb-1">리뷰품질</p>
+                        <span id="reviewStatus" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded">대기</span>
+                    </div>
+                    <div class="bg-slate-50 border p-3 rounded-lg text-center flex flex-col items-center justify-center">
+                        <p class="text-xs text-slate-500 mb-1">저장/공유</p>
+                        <span id="shareStatus" class="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded">대기</span>
+                    </div>
+                </div>
+
+                <!-- 미끼 폼 (리드 캡처) -->
+                <div class="relative rounded-xl overflow-hidden border border-slate-200">
+                    <div class="blur-content p-6 bg-white">
+                        <h3 class="font-bold text-lg mb-4 text-slate-800">📊 항목별 상세 진단 및 해결 솔루션</h3>
+                        <div class="space-y-4"><div class="h-16 bg-slate-100 rounded"></div><div class="h-16 bg-slate-100 rounded"></div></div>
+                    </div>
+
+                    <div class="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center z-10 border-t border-slate-200">
+                        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm border border-slate-100">
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">상세 분석 리포트 & 솔루션 받기</h3>
+                            <p class="text-xs text-slate-500 mb-4">현재 매장의 치명적 문제점과<br>1페이지 노출을 위한 1:1 솔루션을 보내드립니다.</p>
+                            
+                            <input type="email" id="emailInput" placeholder="이메일 주소 입력" class="w-full px-4 py-2 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3">
+                            <button onclick="alert('이 버튼을 누르면 Make.com이나 스티비로 이메일이 전송되도록 세팅하면 됩니다!')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded text-sm transition-colors flex items-center justify-center gap-2">
+                                전체 리포트 무료로 받기 <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // 뱃지 색상을 상태에 따라 변경해주는 함수
+        function getBadgeClass(status) {
+            if(status === '위험') return 'px-2 py-1 bg-red-100 text-red-600 text-xs font-bold rounded';
+            if(status === '보통') return 'px-2 py-1 bg-yellow-100 text-yellow-600 text-xs font-bold rounded';
+            if(status === '양호') return 'px-2 py-1 bg-green-100 text-green-600 text-xs font-bold rounded';
+            return 'px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded';
+        }
+
+        // 실제 파이썬 백엔드 서버와 통신하는 함수
+        async function startRealAnalysis() {
+            const urlInput = document.getElementById('placeUrl').value;
+            const errorMsg = document.getElementById('errorMsg');
+            
+            if(!urlInput) {
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            errorMsg.classList.add('hidden');
+
+            // 로딩 화면 표시
+            document.getElementById('step1-input').classList.add('hidden');
+            document.getElementById('step2-loading').classList.remove('hidden');
+
+            try {
+                // 1. 파이썬 서버로 데이터 전송 (주소가 127.0.0.1:8000 이어야 합니다)
+                const response = await fetch('http://127.0.0.1:8000/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+
+                const result = await response.json();
+
+                // 서버에서 400 에러 등을 반환했을 때
+                if (!response.ok) {
+                    alert(result.detail || "URL 분석 중 오류가 발생했습니다.");
+                    location.reload();
+                    return;
+                }
+
+                // 크롤링 자체에서 에러가 났을 때
+                if (result.raw_data.status === 'error') {
+                    alert("데이터를 긁어오지 못했습니다. 링크를 다시 확인해주세요.");
+                    location.reload();
+                    return;
+                }
+
+                // 2. 서버에서 받은 데이터를 HTML 화면에 입히기
+                const data = result.analysis;
+                const shopName = result.raw_data.shop_name;
+                
+                document.getElementById('shopNameDisplay').innerText = `[${shopName}] 상위노출 경쟁력 요약`;
+                document.getElementById('totalScoreDisplay').innerText = data.total_score;
+                
+                // 점수에 따라 글자 색상 변경
+                const scoreWrap = document.getElementById('scoreColorWrap');
+                const scoreMsg = document.getElementById('scoreMessage');
+                if (data.total_score >= 80) {
+                    scoreWrap.className = "text-5xl font-extrabold flex items-center justify-center gap-2 text-green-500";
+                    scoreMsg.className = "text-green-600 text-sm mt-3 font-medium";
+                    scoreMsg.innerText = "🌟 상위노출 경쟁력이 매우 우수합니다!";
+                } else if (data.total_score >= 50) {
+                    scoreWrap.className = "text-5xl font-extrabold flex items-center justify-center gap-2 text-yellow-500";
+                    scoreMsg.className = "text-yellow-600 text-sm mt-3 font-medium";
+                    scoreMsg.innerText = "⚠️ 1페이지 노출을 위해 일부 개선이 필요합니다.";
+                } else {
+                    scoreWrap.className = "text-5xl font-extrabold flex items-center justify-center gap-2 text-red-500";
+                    scoreMsg.className = "text-red-600 text-sm mt-3 font-medium";
+                    scoreMsg.innerText = "🚨 1페이지 노출을 위해 시급한 개선이 필요합니다.";
+                }
+
+                // 5대 지표 업데이트
+                const metrics = data.metrics;
+                const mapping = {
+                    'trafficStatus': metrics.traffic.status,
+                    'dwellStatus': metrics.dwell_time.status,
+                    'seoStatus': metrics.seo.status,
+                    'reviewStatus': metrics.review_quality.status,
+                    'shareStatus': metrics.save_share.status
+                };
+
+                for (const [id, status] of Object.entries(mapping)) {
+                    const el = document.getElementById(id);
+                    el.innerText = status;
+                    el.className = getBadgeClass(status);
+                }
+
+                // 3. 로딩 숨기고 결과 화면 띄우기
+                document.getElementById('step2-loading').classList.add('hidden');
+                document.getElementById('step3-results').classList.remove('hidden');
+
+            } catch (error) {
+                console.error(error);
+                alert("서버와 연결할 수 없습니다. 터미널에서 FastAPI 서버가 켜져 있는지 확인해주세요!");
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
